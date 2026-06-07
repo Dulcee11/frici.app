@@ -5,6 +5,7 @@ const KEYS = {
   CHECKIN: 'frici_checkin',
   MOOD_TODAY: 'frici_mood_today',
   STATS: 'frici_stats',
+  USER: 'frici_user',
 };
 
 const DEFAULT_HABITS = [
@@ -13,6 +14,27 @@ const DEFAULT_HABITS = [
   { id: '3', label: 'Meditar 5 min', done: false, streak: 0 },
   { id: '4', label: 'Dormir antes de 11pm', done: false, streak: 0 },
 ];
+
+// ── Usuario ──────────────────────────────────────────────────────────────────
+
+export async function getUser() {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.USER);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveUser(user) {
+  await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
+}
+
+export async function deleteUser() {
+  await AsyncStorage.removeItem(KEYS.USER);
+}
+
+// ── Hábitos ──────────────────────────────────────────────────────────────────
 
 export async function getHabits() {
   try {
@@ -27,6 +49,8 @@ export async function saveHabits(habits) {
   await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(habits));
 }
 
+// ── Check-in ─────────────────────────────────────────────────────────────────
+
 export async function getCheckIn() {
   try {
     const raw = await AsyncStorage.getItem(KEYS.CHECKIN);
@@ -39,6 +63,8 @@ export async function getCheckIn() {
 export async function saveCheckIn(data) {
   await AsyncStorage.setItem(KEYS.CHECKIN, JSON.stringify({ ...data, date: new Date().toDateString() }));
 }
+
+// ── Ánimo ─────────────────────────────────────────────────────────────────────
 
 export async function getMoodToday() {
   try {
@@ -55,6 +81,8 @@ export async function getMoodToday() {
 export async function saveMoodToday(mood) {
   await AsyncStorage.setItem(KEYS.MOOD_TODAY, JSON.stringify({ mood, date: new Date().toDateString() }));
 }
+
+// ── Estadísticas ──────────────────────────────────────────────────────────────
 
 export async function getStats() {
   try {

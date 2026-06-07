@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View } from 'react-native';
+import { Text, View, ActivityIndicator } from 'react-native';
 
+import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import CheckInScreen from './src/screens/CheckInScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import { colors } from './src/theme';
+import { getUser } from './src/storage';
 
 const Tab = createBottomTabNavigator();
 
@@ -22,7 +24,7 @@ function TabIcon({ emoji, focused }) {
   );
 }
 
-export default function App() {
+function MainApp({ user }) {
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -39,31 +41,41 @@ export default function App() {
           tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
         }}
       >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            tabBarLabel: 'Inicio',
-            tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
-          }}
-        />
-        <Tab.Screen
-          name="CheckIn"
-          component={CheckInScreen}
-          options={{
-            tabBarLabel: 'Bienestar',
-            tabBarIcon: ({ focused }) => <TabIcon emoji="💚" focused={focused} />,
-          }}
-        />
-        <Tab.Screen
-          name="Chat"
-          component={ChatScreen}
-          options={{
-            tabBarLabel: 'FRICI IA',
-            tabBarIcon: ({ focused }) => <TabIcon emoji="💬" focused={focused} />,
-          }}
-        />
+        <Tab.Screen name="Home" options={{ tabBarLabel: 'Inicio', tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} /> }}>
+          {props => <HomeScreen {...props} user={user} />}
+        </Tab.Screen>
+        <Tab.Screen name="CheckIn" options={{ tabBarLabel: 'Bienestar', tabBarIcon: ({ focused }) => <TabIcon emoji="💚" focused={focused} /> }}>
+          {props => <CheckInScreen {...props} user={user} />}
+        </Tab.Screen>
+        <Tab.Screen name="Chat" options={{ tabBarLabel: 'FRICI IA', tabBarIcon: ({ focused }) => <TabIcon emoji="💬" focused={focused} /> }}>
+          {props => <ChatScreen {...props} user={user} />}
+        </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
   );
+}
+
+export default function App() {
+  const [user, setUser] = useState(undefined); // undefined = cargando
+
+  useEffect(() => {
+    getUser().then(u => setUser(u || null));
+  }, []);
+
+  // Splash / loading
+  if (user === undefined) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.lilaDark} />
+      </View>
+    );
+  }
+
+  // No hay sesión → login/registro
+  if (!user) {
+    return <LoginScreen onLogin={u => setUser(u)} />;
+  }
+
+  // Sesión activa → app principal
+  return <MainApp user={user} />;
 }

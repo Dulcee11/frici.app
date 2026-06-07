@@ -58,7 +58,7 @@ function Message({ msg }) {
   );
 }
 
-export default function ChatScreen() {
+export default function ChatScreen({ user }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,11 +75,10 @@ export default function ChatScreen() {
   );
 
   async function loadContextAndInit() {
-    // Carga todo el contexto del usuario
     const [checkin, mood, habits, stats] = await Promise.all([
       getCheckIn(), getMoodToday(), getHabits(), getStats(),
     ]);
-    const ctx = { checkin, mood, habits, stats };
+    const ctx = { checkin, mood, habits, stats, userName: user?.firstName || user?.name?.split(' ')[0] };
     setUserContext(ctx);
 
     // Verifica que el servidor esté corriendo
@@ -109,22 +108,23 @@ export default function ChatScreen() {
   }
 
   function buildGreeting(ctx) {
-    const { mood, checkin, habits } = ctx;
+    const { mood, checkin, habits, userName } = ctx;
+    const name = userName ? `, ${userName}` : '';
     const moods = ['bien', 'un poco regular', 'cansada', 'agotada'];
     const moodTxt = mood !== null && mood !== undefined ? `te sientes ${moods[mood] || 'así'}` : 'no has registrado tu ánimo todavía';
 
     if (checkin?.carga > 70 && checkin?.emotions?.some(e => ['Estrés', 'Ansiedad', 'Cansancio'].includes(e))) {
-      return `Hola 💚 Veo que hoy tienes una carga alta (${checkin.carga}%) y ${moodTxt}. Estoy aquí. ¿Qué necesitas en este momento?`;
+      return `Hola${name} 💚 Veo que hoy tienes una carga alta (${checkin.carga}%) y ${moodTxt}. Estoy aquí. ¿Qué necesitas en este momento?`;
     }
 
     const doneHabits = habits?.filter(h => h.done).length ?? 0;
     const totalHabits = habits?.length ?? 0;
 
     if (doneHabits === totalHabits && totalHabits > 0) {
-      return `¡Hola! 🌿 Completaste todos tus hábitos de hoy — eso merece un reconocimiento. ¿En qué puedo acompañarte ahora?`;
+      return `¡Hola${name}! 🌿 Completaste todos tus hábitos de hoy — eso merece un reconocimiento. ¿En qué puedo acompañarte ahora?`;
     }
 
-    return `Hola 💚 Hoy ${moodTxt}. ¿Cómo puedo ayudarte?`;
+    return `Hola${name} 💚 Hoy ${moodTxt}. ¿Cómo puedo ayudarte?`;
   }
 
   function scrollToBottom() {

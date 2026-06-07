@@ -6,7 +6,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadow } from '../theme';
-import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats } from '../storage';
+import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats, getUser } from '../storage';
+import { analyzeToday, formatWorkTime } from '../services/calendar';
 
 const MOODS = [
   { emoji: '😊', label: 'Bien' },
@@ -22,16 +23,18 @@ function getDateLabel() {
   return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, user }) {
   const [habits, setHabits] = useState([]);
   const [mood, setMood] = useState(null);
   const [stats, setStats] = useState({ habitsCompleted: 5, sleepHours: 6, streakDays: 3 });
+  const [calData, setCalData] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
       getHabits().then(setHabits);
       getMoodToday().then(setMood);
       getStats().then(setStats);
+      analyzeToday().then(setCalData);
     }, [])
   );
 
@@ -50,7 +53,11 @@ export default function HomeScreen({ navigation }) {
     await saveMoodToday(idx);
   }
 
+  const firstName = user?.firstName || user?.name?.split(' ')[0] || 'tú';
   const doneCount = habits.filter(h => h.done).length;
+  const workTimeLabel = calData?.granted ? formatWorkTime(calData.workHours) : null;
+  const showNoBreakAlert = calData?.noBreakWarning;
+  const eventCount = calData?.eventCount ?? 0;
 
   return (
     <View style={styles.container}>
@@ -59,23 +66,42 @@ export default function HomeScreen({ navigation }) {
         {/* Header gradient */}
         <LinearGradient colors={['#EDE9FE', '#D1FAE5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <View style={styles.topBar}>
-            <View style={styles.avatar}><Text style={styles.avatarTxt}>CF</Text></View>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarTxt}>{firstName.slice(0, 2).toUpperCase()}</Text>
+            </View>
             <Text style={styles.bell}>🔔</Text>
           </View>
           <Text style={styles.dateLabel}>{getDateLabel()}</Text>
-          <Text style={styles.greeting}>Hola, Cielo 🌿</Text>
-          <Text style={styles.subGreeting}>Llevas 2h 40min frente a pantallas hoy</Text>
+          <Text style={styles.greeting}>Hola, {firstName} 🌿</Text>
+          <Text style={styles.subGreeting}>
+            {workTimeLabel
+              ? `Llevas ${workTimeLabel} de actividad digital hoy`
+              : calData?.granted === false
+                ? 'Conecta tu calendario para ver tu carga'
+                : 'Cargando datos de tu calendario...'}
+          </Text>
         </LinearGradient>
 
         <View style={styles.body}>
-          {/* Alert */}
-          <View style={styles.alertBox}>
-            <Text style={styles.alertIcon}>⚠️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.alertTitle}>Pausa sugerida</Text>
-              <Text style={styles.alertText}>Tu agenda tiene 6 actividades hoy. ¿Quieres un bloque de descanso?</Text>
+          {/* Alerta de calendario — sin descanso */}
+          {showNoBreakAlert && (
+            <View style={styles.alertBox}>
+              <Text style={styles.alertIcon}>⚠️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.alertTitle}>Pausa sugerida</Text>
+                <Text style={styles.alertText}>
+                  Llevas +{Math.round((calData?.longestBlock ?? 90) / 60 * 10) / 10}h sin descanso según tu calendario ({eventCount} actividades hoy). ¿Quieres agregar un bloque de pausa?
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
+
+          {/* Sin permiso de calendario */}
+          {calData?.granted === false && (
+            <TouchableOpacity style={styles.calBanner} onPress={() => analyzeToday().then(setCalData)}>
+              <Text style={styles.calBannerTxt}>📅 Conecta tu calendario para que FRICI detecte tu carga real → Tocar para permitir</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Mood */}
           <View style={styles.card}>
@@ -132,23 +158,28 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisSuave },
-  header: { padding: 24, paddingTop: 48, paddingBottom: 20 },
+  header: { padding: 24, paddingTop: 52, paddingBottom: 20 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.lilaDark, alignItems: 'center', justifyContent: 'center' },
-  avatarTxt: { color: colors.blanco, fontWeight: '600', fontSize: 14 },
-  bell: { fontSize: 20, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 18, width: 36, height: 36, textAlign: 'center', lineHeight: 36 },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.lilaDark, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt: { color: colors.blanco, fontWeight: '700', fontSize: 14 },
+  bell: { fontSize: 20, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 19, width: 38, height: 38, textAlign: 'center', lineHeight: 38 },
   dateLabel: { fontSize: 11, color: colors.lilaDark, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
   greeting: { fontSize: 26, fontWeight: '700', color: colors.texto, marginBottom: 4 },
   subGreeting: { fontSize: 12, color: colors.textoMedio },
   body: { padding: 16, gap: 12 },
   alertBox: {
-    backgroundColor: colors.amarilloLight, borderRadius: radius.sm,
+    backgroundColor: '#FEF3C7', borderRadius: radius.sm,
     padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    borderLeftWidth: 3, borderLeftColor: colors.amarillo, marginBottom: 4,
+    borderLeftWidth: 3, borderLeftColor: '#F59E0B', marginBottom: 4,
   },
   alertIcon: { fontSize: 18 },
   alertTitle: { fontWeight: '600', fontSize: 12, color: '#92400E', marginBottom: 2 },
   alertText: { fontSize: 11, color: '#92400E', lineHeight: 16 },
+  calBanner: {
+    backgroundColor: colors.lilaLight, borderRadius: radius.sm, padding: 12,
+    borderWidth: 1, borderColor: colors.lila, marginBottom: 4,
+  },
+  calBannerTxt: { fontSize: 12, color: colors.lilaDark, textAlign: 'center', lineHeight: 18 },
   card: { backgroundColor: colors.blanco, borderRadius: radius.md, padding: 16, ...shadow.md },
   cardLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1, color: colors.textoSuave, textTransform: 'uppercase', marginBottom: 12 },
   moodRow: { flexDirection: 'row', gap: 8 },

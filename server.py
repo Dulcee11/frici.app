@@ -28,6 +28,9 @@ client = anthropic.Anthropic(api_key=API_KEY)
 SYSTEM_PROMPT = """Eres FRICI, una compañera de bienestar digital empática, cálida y directa. \
 Tu objetivo es ayudar a la usuaria a evitar el agotamiento digital, mejorar sus hábitos y gestionar mejor su energía.
 
+## Usuaria actual:
+{user_name}
+
 ## Lo que sabes de la usuaria en este momento:
 {user_context}
 
@@ -106,7 +109,9 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail="Configura tu ANTHROPIC_API_KEY en server.py o como variable de entorno.")
 
     context_text = build_context_text(req.user_context)
-    system = SYSTEM_PROMPT.format(user_context=context_text)
+    user_name = req.user_context.get("userName", "")
+    name_line = f"Nombre: {user_name}. Llámala por su nombre en los saludos." if user_name else "Nombre desconocido."
+    system = SYSTEM_PROMPT.format(user_name=name_line, user_context=context_text)
 
     messages = [{"role": m.role, "content": m.text} for m in req.history]
     messages.append({"role": "user", "content": req.message})
