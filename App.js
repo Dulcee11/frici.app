@@ -11,7 +11,7 @@ import ChatScreen from './src/screens/ChatScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import HabitsEditScreen from './src/screens/HabitsEditScreen';
 import { colors } from './src/theme';
-import { getUser } from './src/storage';
+import { getSession } from './src/storage';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -77,7 +77,7 @@ export default function App() {
   const [user, setUser] = useState(undefined);
 
   useEffect(() => {
-    getUser().then(u => setUser(u || null));
+    getSession().then(u => setUser(u || null));
   }, []);
 
   if (user === undefined) {

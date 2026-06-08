@@ -4,7 +4,8 @@ import {
   Image, ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getUser, saveUser } from '../storage';
+import { getUser, saveUser, getSession } from '../storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '../theme';
 
 // Guarda el logo en assets/logo.png para que aparezca aquí
@@ -42,6 +43,8 @@ export default function LoginScreen({ onLogin }) {
       Alert.alert('Contraseña incorrecta', 'Verifica tu contraseña e intenta de nuevo.');
       return;
     }
+    // Abre la sesión sin tocar el perfil guardado
+    await AsyncStorage.setItem('frici_session', JSON.stringify(user));
     onLogin(user);
   }
 

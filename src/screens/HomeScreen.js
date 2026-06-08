@@ -6,7 +6,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadow } from '../theme';
-import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats, deleteUser } from '../storage';
+import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats, logout } from '../storage';
 import { analyzeToday, formatWorkTime } from '../services/calendar';
 
 const MOODS = [
@@ -62,7 +62,7 @@ export default function HomeScreen({ navigation, user, onLogout }) {
             { text: 'Cerrar sesión', style: 'destructive', onPress: () => resolve(true) },
           ])
         );
-    if (confirmed) { await deleteUser(); onLogout(); }
+    if (confirmed) { await logout(); onLogout(); }
   }
 
   const firstName = user?.firstName || user?.name?.split(' ')[0] || '';

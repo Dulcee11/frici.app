@@ -5,8 +5,9 @@ const KEYS = {
   CHECKIN: 'frici_checkin',
   MOOD_TODAY: 'frici_mood_today',
   STATS: 'frici_stats',
-  USER: 'frici_user',
-  HISTORY: 'frici_history',   // historial diario para estadísticas
+  USER: 'frici_user',       // perfil permanente (nunca se borra)
+  SESSION: 'frici_session', // sesión activa (se borra al cerrar sesión)
+  HISTORY: 'frici_history',
 };
 
 const DEFAULT_HABITS = [
@@ -26,11 +27,27 @@ export async function getUser() {
 }
 
 export async function saveUser(user) {
+  // Guarda el perfil Y abre la sesión
   await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
+  await AsyncStorage.setItem(KEYS.SESSION, JSON.stringify(user));
 }
 
+// Devuelve el usuario si hay sesión activa (login)
+export async function getSession() {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.SESSION);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+// Cierra sesión sin borrar el perfil
+export async function logout() {
+  await AsyncStorage.removeItem(KEYS.SESSION);
+}
+
+// Solo para migraciones — no usar en logout
 export async function deleteUser() {
-  await AsyncStorage.removeItem(KEYS.USER);
+  await AsyncStorage.multiRemove([KEYS.USER, KEYS.SESSION]);
 }
 
 // ── Hábitos ──────────────────────────────────────────────────────────────────
