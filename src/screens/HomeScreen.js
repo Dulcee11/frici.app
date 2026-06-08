@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, Alert,
+  StyleSheet, StatusBar, Alert, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,11 +53,16 @@ export default function HomeScreen({ navigation, user, onLogout }) {
     await saveMoodToday(idx);
   }
 
-  function handleLogout() {
-    Alert.alert('Cerrar sesión', '¿Segura que quieres salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cerrar sesión', style: 'destructive', onPress: async () => { await deleteUser(); onLogout(); } },
-    ]);
+  async function handleLogout() {
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm('¿Segura que quieres cerrar sesión?')
+      : await new Promise(resolve =>
+          Alert.alert('Cerrar sesión', '¿Segura que quieres salir?', [
+            { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Cerrar sesión', style: 'destructive', onPress: () => resolve(true) },
+          ])
+        );
+    if (confirmed) { await deleteUser(); onLogout(); }
   }
 
   const firstName = user?.firstName || user?.name?.split(' ')[0] || '';

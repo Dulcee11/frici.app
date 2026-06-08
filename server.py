@@ -11,8 +11,9 @@ from dotenv import load_dotenv
 
 load_dotenv()  # lee .env si existe
 
-# ── Pon tu API key en el archivo .env como: ANTHROPIC_API_KEY=sk-ant-... ──
-API_KEY = os.environ.get("ANTHROPIC_API_KEY", "PEGA_TU_API_KEY_AQUI")
+# ── Pon tu API key en .env como: ANTHROPIC_API_KEY=sk-ant-... ──
+# El SDK la lee del entorno automáticamente; solo la usamos para validar.
+API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
 app = FastAPI(title="FRICI AI Server")
 
@@ -23,7 +24,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = anthropic.Anthropic(api_key=API_KEY)
+# Si hay key explícita la pasamos; si no, el SDK busca ANTHROPIC_API_KEY en el entorno
+client = anthropic.Anthropic(api_key=API_KEY) if API_KEY else anthropic.Anthropic()
 
 SYSTEM_PROMPT = """Eres FRICI, una compañera de bienestar digital empática, cálida y directa. \
 Tu objetivo es ayudar a la usuaria a evitar el agotamiento digital, mejorar sus hábitos y gestionar mejor su energía.
@@ -105,26 +107,27 @@ def build_context_text(ctx: dict) -> str:
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    if API_KEY == "PEGA_TU_API_KEY_AQUI":
-        raise HTTPException(status_code=500, detail="Configura tu ANTHROPIC_API_KEY en server.py o como variable de entorno.")
+    if not API_KEY and not os.environ.get("ANTHROPIC_API_KEY"):
+        raise HTTPException(status_code=500, detail="Configura ANTHROPIC_API_KEY en el archivo .env o como variable de entorno.")
+    try:
+        context_text = build_context_text(req.user_context)
+        user_name = req.user_context.get("userName", "")
+        name_line = f"Nombre: {user_name}. Llámala por su nombre en los saludos." if user_name else "Nombre desconocido."
+        system = SYSTEM_PROMPT.replace("{user_name}", name_line).replace("{user_context}", context_text)
 
-    context_text = build_context_text(req.user_context)
-    user_name = req.user_context.get("userName", "")
-    name_line = f"Nombre: {user_name}. Llámala por su nombre en los saludos." if user_name else "Nombre desconocido."
-    system = SYSTEM_PROMPT.format(user_name=name_line, user_context=context_text)
+        messages = [{"role": m.role, "content": m.text} for m in req.history]
+        messages.append({"role": "user", "content": req.message})
 
-    messages = [{"role": m.role, "content": m.text} for m in req.history]
-    messages.append({"role": "user", "content": req.message})
-
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=600,
-        system=system,
-        messages=messages,
-    )
-
-    return {"reply": response.content[0].text}
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=system,
+            messages=messages,
+        )
+        return {"reply": response.content[0].text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al llamar a Claude: {str(e)}")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "api_key_configured": API_KEY != "PEGA_TU_API_KEY_AQUI"}
+    return {"status": "ok", "api_key_configured": bool(API_KEY or os.environ.get("ANTHROPIC_API_KEY"))}
