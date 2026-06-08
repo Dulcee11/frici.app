@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar,
+  StyleSheet, StatusBar, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadow } from '../theme';
-import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats, getUser } from '../storage';
+import { getHabits, saveHabits, getMoodToday, saveMoodToday, getStats, deleteUser } from '../storage';
 import { analyzeToday, formatWorkTime } from '../services/calendar';
 
 const MOODS = [
@@ -23,10 +23,10 @@ function getDateLabel() {
   return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
 
-export default function HomeScreen({ navigation, user }) {
+export default function HomeScreen({ navigation, user, onLogout }) {
   const [habits, setHabits] = useState([]);
   const [mood, setMood] = useState(null);
-  const [stats, setStats] = useState({ habitsCompleted: 5, sleepHours: 6, streakDays: 3 });
+  const [stats, setStats] = useState({ sleepHours: 0, streakDays: 0 });
   const [calData, setCalData] = useState(null);
 
   useFocusEffect(
@@ -53,7 +53,14 @@ export default function HomeScreen({ navigation, user }) {
     await saveMoodToday(idx);
   }
 
-  const firstName = user?.firstName || user?.name?.split(' ')[0] || 'tú';
+  function handleLogout() {
+    Alert.alert('Cerrar sesión', '¿Segura que quieres salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Cerrar sesión', style: 'destructive', onPress: async () => { await deleteUser(); onLogout(); } },
+    ]);
+  }
+
+  const firstName = user?.firstName || user?.name?.split(' ')[0] || '';
   const doneCount = habits.filter(h => h.done).length;
   const workTimeLabel = calData?.granted ? formatWorkTime(calData.workHours) : null;
   const showNoBreakAlert = calData?.noBreakWarning;
@@ -63,13 +70,15 @@ export default function HomeScreen({ navigation, user }) {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header gradient */}
+        {/* Header */}
         <LinearGradient colors={['#EDE9FE', '#D1FAE5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <View style={styles.topBar}>
             <View style={styles.avatar}>
               <Text style={styles.avatarTxt}>{firstName.slice(0, 2).toUpperCase()}</Text>
             </View>
-            <Text style={styles.bell}>🔔</Text>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+              <Text style={styles.logoutTxt}>Salir →</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.dateLabel}>{getDateLabel()}</Text>
           <Text style={styles.greeting}>Hola, {firstName} 🌿</Text>
@@ -83,23 +92,22 @@ export default function HomeScreen({ navigation, user }) {
         </LinearGradient>
 
         <View style={styles.body}>
-          {/* Alerta de calendario — sin descanso */}
+          {/* Alerta calendario */}
           {showNoBreakAlert && (
             <View style={styles.alertBox}>
               <Text style={styles.alertIcon}>⚠️</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.alertTitle}>Pausa sugerida</Text>
                 <Text style={styles.alertText}>
-                  Llevas +{Math.round((calData?.longestBlock ?? 90) / 60 * 10) / 10}h sin descanso según tu calendario ({eventCount} actividades hoy). ¿Quieres agregar un bloque de pausa?
+                  Llevas +{Math.round((calData?.longestBlock ?? 90) / 60 * 10) / 10}h sin descanso ({eventCount} actividades hoy). ¿Quieres agregar un bloque de pausa?
                 </Text>
               </View>
             </View>
           )}
 
-          {/* Sin permiso de calendario */}
           {calData?.granted === false && (
             <TouchableOpacity style={styles.calBanner} onPress={() => analyzeToday().then(setCalData)}>
-              <Text style={styles.calBannerTxt}>📅 Conecta tu calendario para que FRICI detecte tu carga real → Tocar para permitir</Text>
+              <Text style={styles.calBannerTxt}>📅 Toca aquí para conectar tu calendario y detectar tu carga real</Text>
             </TouchableOpacity>
           )}
 
@@ -125,7 +133,7 @@ export default function HomeScreen({ navigation, user }) {
                 <Text style={styles.statLbl}>Hábitos</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={styles.statVal}>{stats.sleepHours}h</Text>
+                <Text style={styles.statVal}>{stats.sleepHours > 0 ? `${stats.sleepHours}h` : '--'}</Text>
                 <Text style={styles.statLbl}>Sueño</Text>
               </View>
               <View style={styles.statBox}>
@@ -135,9 +143,19 @@ export default function HomeScreen({ navigation, user }) {
             </View>
           </View>
 
-          {/* Habits */}
+          {/* Hábitos */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Hábitos de hoy</Text>
+            <View style={styles.habitsHeader}>
+              <Text style={styles.cardLabel}>Hábitos de hoy</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('HabitsEdit')} style={styles.editHabitsBtn}>
+                <Text style={styles.editHabitsTxt}>✏️ Editar</Text>
+              </TouchableOpacity>
+            </View>
+            {habits.length === 0 && (
+              <TouchableOpacity onPress={() => navigation.navigate('HabitsEdit')} style={styles.emptyHabits}>
+                <Text style={styles.emptyHabitsTxt}>+ Agrega tus primeros hábitos</Text>
+              </TouchableOpacity>
+            )}
             {habits.map(h => (
               <TouchableOpacity key={h.id} style={styles.habitRow} onPress={() => toggleHabit(h.id)}>
                 <View style={[styles.check, h.done && styles.checkDone]}>
@@ -149,6 +167,11 @@ export default function HomeScreen({ navigation, user }) {
                 </View>
               </TouchableOpacity>
             ))}
+            {habits.length > 0 && doneCount === habits.length && (
+              <View style={styles.allDoneBanner}>
+                <Text style={styles.allDoneTxt}>🎉 ¡Completaste todos tus hábitos de hoy!</Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -162,35 +185,38 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.lilaDark, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { color: colors.blanco, fontWeight: '700', fontSize: 14 },
-  bell: { fontSize: 20, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 19, width: 38, height: 38, textAlign: 'center', lineHeight: 38 },
+  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 6 },
+  logoutTxt: { fontSize: 12, color: colors.lilaDark, fontWeight: '600' },
   dateLabel: { fontSize: 11, color: colors.lilaDark, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
   greeting: { fontSize: 26, fontWeight: '700', color: colors.texto, marginBottom: 4 },
   subGreeting: { fontSize: 12, color: colors.textoMedio },
   body: { padding: 16, gap: 12 },
   alertBox: {
-    backgroundColor: '#FEF3C7', borderRadius: radius.sm,
-    padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#FEF3C7', borderRadius: radius.sm, padding: 12,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
     borderLeftWidth: 3, borderLeftColor: '#F59E0B', marginBottom: 4,
   },
   alertIcon: { fontSize: 18 },
   alertTitle: { fontWeight: '600', fontSize: 12, color: '#92400E', marginBottom: 2 },
   alertText: { fontSize: 11, color: '#92400E', lineHeight: 16 },
-  calBanner: {
-    backgroundColor: colors.lilaLight, borderRadius: radius.sm, padding: 12,
-    borderWidth: 1, borderColor: colors.lila, marginBottom: 4,
-  },
+  calBanner: { backgroundColor: colors.lilaLight, borderRadius: radius.sm, padding: 12, borderWidth: 1, borderColor: colors.lila },
   calBannerTxt: { fontSize: 12, color: colors.lilaDark, textAlign: 'center', lineHeight: 18 },
   card: { backgroundColor: colors.blanco, borderRadius: radius.md, padding: 16, ...shadow.md },
-  cardLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1, color: colors.textoSuave, textTransform: 'uppercase', marginBottom: 12 },
-  moodRow: { flexDirection: 'row', gap: 8 },
+  cardLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1, color: colors.textoSuave, textTransform: 'uppercase' },
+  moodRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   moodBtn: { flex: 1, backgroundColor: colors.lilaLight, borderRadius: radius.xs, padding: 10, alignItems: 'center', borderWidth: 1.5, borderColor: 'transparent' },
   moodBtnSel: { borderColor: colors.lilaDark, transform: [{ scale: 1.05 }] },
   moodEmoji: { fontSize: 20 },
   moodLabel: { fontSize: 9, color: colors.textoMedio, marginTop: 3 },
-  statsRow: { flexDirection: 'row', gap: 8 },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   statBox: { flex: 1, backgroundColor: colors.lilaLight, borderRadius: radius.xs, padding: 12, alignItems: 'center' },
   statVal: { fontSize: 20, fontWeight: '700', color: colors.lilaDark },
   statLbl: { fontSize: 9, color: colors.textoMedio, marginTop: 3 },
+  habitsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  editHabitsBtn: { backgroundColor: colors.lilaLight, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  editHabitsTxt: { fontSize: 11, color: colors.lilaDark, fontWeight: '600' },
+  emptyHabits: { alignItems: 'center', padding: 16, borderWidth: 1.5, borderColor: colors.lila, borderRadius: radius.sm, borderStyle: 'dashed' },
+  emptyHabitsTxt: { color: colors.lilaDark, fontWeight: '600', fontSize: 13 },
   habitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)', gap: 10 },
   check: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.lila, alignItems: 'center', justifyContent: 'center' },
   checkDone: { backgroundColor: colors.lilaDark, borderColor: colors.lilaDark },
@@ -199,4 +225,6 @@ const styles = StyleSheet.create({
   habitDone: { textDecorationLine: 'line-through', color: colors.textoSuave },
   streakPill: { backgroundColor: colors.lilaLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   streakTxt: { fontSize: 10, color: colors.textoMedio },
+  allDoneBanner: { backgroundColor: colors.verdeLight, borderRadius: radius.xs, padding: 10, marginTop: 8, alignItems: 'center' },
+  allDoneTxt: { color: colors.verdeDark, fontWeight: '600', fontSize: 13 },
 });

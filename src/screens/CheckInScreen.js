@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert,
+  StyleSheet, Alert, TextInput,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadow } from '../theme';
-import { saveCheckIn, updateStats } from '../storage';
+import { saveCheckIn, updateStats, maybeUpdateStreak } from '../storage';
 
 const SLEEP_OPTIONS = ['Muy bien 😴', 'Bien', 'Regular', 'Mal 😞'];
 const EMOTIONS = ['Cansancio', 'Ansiedad', 'Motivación', 'Estrés', 'Tristeza', 'Calma 🌿', 'Alegría', 'Irritabilidad'];
@@ -15,6 +15,7 @@ export default function CheckInScreen({ navigation }) {
   const [step, setStep] = useState(0);
   const [carga, setCarga] = useState(50);
   const [sleep, setSleep] = useState(null);
+  const [sleepHours, setSleepHours] = useState('');
   const [emotions, setEmotions] = useState([]);
 
   function toggleEmotion(e) {
@@ -22,23 +23,34 @@ export default function CheckInScreen({ navigation }) {
   }
 
   async function handleSave() {
-    if (sleep === null) { Alert.alert('Falta un dato', 'Selecciona cómo dormiste.'); return; }
-    await saveCheckIn({ carga, sleep: SLEEP_OPTIONS[sleep], emotions });
+    if (sleep === null) {
+      Alert.alert('Falta un dato', 'Selecciona cómo dormiste anoche.');
+      return;
+    }
+    const hours = parseFloat(sleepHours);
+    if (sleepHours && (isNaN(hours) || hours < 0 || hours > 24)) {
+      Alert.alert('Horas inválidas', 'Ingresa un número entre 0 y 24.');
+      return;
+    }
+
     const sleepMap = { 0: 8, 1: 7, 2: 6, 3: 4 };
-    await updateStats({ sleepHours: sleepMap[sleep] });
-    Alert.alert('¡Check-in guardado! 💚', `Carga: ${carga}%\nSueño: ${SLEEP_OPTIONS[sleep]}\nEmociones: ${emotions.join(', ') || 'ninguna'}`, [
-      { text: 'Ver resumen', onPress: () => navigation.navigate('Home') },
-    ]);
+    const finalHours = sleepHours ? hours : sleepMap[sleep];
+
+    await saveCheckIn({ carga, sleep: SLEEP_OPTIONS[sleep], sleepHours: finalHours, emotions });
+    await updateStats({ sleepHours: finalHours });
+    await maybeUpdateStreak();
+
+    navigation.navigate('Stats');
   }
 
   const dots = [0, 1, 2];
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <LinearGradient colors={['#D1FAE5', '#EDE9FE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <Text style={styles.title}>Check-in diario 💚</Text>
-          <Text style={styles.sub}>3 preguntas rápidas · 2 minutos</Text>
+          <Text style={styles.sub}>3 preguntas rápidas · 30 segundos</Text>
         </LinearGradient>
 
         {/* Progress dots */}
@@ -59,8 +71,7 @@ export default function CheckInScreen({ navigation }) {
             </View>
             <Slider
               style={styles.slider}
-              minimumValue={0}
-              maximumValue={100}
+              minimumValue={0} maximumValue={100}
               value={carga}
               onValueChange={v => { setCarga(Math.round(v)); if (step < 1) setStep(1); }}
               minimumTrackTintColor={colors.lilaDark}
@@ -70,7 +81,7 @@ export default function CheckInScreen({ navigation }) {
             <Text style={styles.sliderVal}>{carga}%</Text>
           </View>
 
-          {/* Q2: sleep */}
+          {/* Q2: sueño */}
           <View style={styles.section}>
             <Text style={styles.qLabel}>PREGUNTA 2 DE 3</Text>
             <Text style={styles.question}>¿Cómo dormiste anoche?</Text>
@@ -85,9 +96,25 @@ export default function CheckInScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
+            {/* Horas de sueño */}
+            <View style={styles.sleepHoursRow}>
+              <Text style={styles.sleepHoursLabel}>¿Cuántas horas dormiste? (opcional)</Text>
+              <View style={styles.sleepHoursInput}>
+                <TextInput
+                  style={styles.hoursField}
+                  value={sleepHours}
+                  onChangeText={setSleepHours}
+                  placeholder="ej. 7"
+                  placeholderTextColor={colors.textoSuave}
+                  keyboardType="decimal-pad"
+                  maxLength={4}
+                />
+                <Text style={styles.hoursUnit}>horas</Text>
+              </View>
+            </View>
           </View>
 
-          {/* Q3: emotions */}
+          {/* Q3: emociones */}
           <View style={styles.section}>
             <Text style={styles.qLabel}>PREGUNTA 3 DE 3</Text>
             <Text style={styles.question}>¿Qué emociones sientes ahora? (elige varias)</Text>
@@ -105,7 +132,7 @@ export default function CheckInScreen({ navigation }) {
           </View>
 
           <TouchableOpacity style={styles.cta} onPress={handleSave}>
-            <Text style={styles.ctaTxt}>Guardar y ver mi resumen →</Text>
+            <Text style={styles.ctaTxt}>Guardar y ver mis estadísticas →</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -115,7 +142,7 @@ export default function CheckInScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisSuave },
-  header: { padding: 24, paddingTop: 48, paddingBottom: 20 },
+  header: { padding: 24, paddingTop: 52, paddingBottom: 20 },
   title: { fontSize: 24, fontWeight: '700', color: colors.texto, marginBottom: 4 },
   sub: { fontSize: 12, color: colors.textoMedio },
   progressRow: { flexDirection: 'row', gap: 6, padding: 16, paddingBottom: 0 },
@@ -130,7 +157,7 @@ const styles = StyleSheet.create({
   sliderLbl: { fontSize: 11, color: colors.textoSuave },
   slider: { width: '100%', height: 40 },
   sliderVal: { textAlign: 'center', fontSize: 13, fontWeight: '600', color: colors.lilaDark },
-  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   optChip: {
     backgroundColor: colors.blanco, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.1)',
     borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 8,
@@ -138,6 +165,15 @@ const styles = StyleSheet.create({
   optChipSel: { backgroundColor: colors.lilaDark, borderColor: colors.lilaDark },
   optTxt: { fontSize: 13, color: colors.texto },
   optTxtSel: { color: colors.blanco },
+  sleepHoursRow: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 12 },
+  sleepHoursLabel: { fontSize: 12, color: colors.textoMedio, marginBottom: 8 },
+  sleepHoursInput: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hoursField: {
+    width: 80, backgroundColor: colors.lilaLight, borderRadius: radius.xs,
+    padding: 10, fontSize: 16, fontWeight: '600', color: colors.lilaDark,
+    textAlign: 'center', borderWidth: 1.5, borderColor: colors.lila,
+  },
+  hoursUnit: { fontSize: 14, color: colors.textoMedio },
   emotionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   emotionChip: {
     backgroundColor: colors.blanco, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.08)',
