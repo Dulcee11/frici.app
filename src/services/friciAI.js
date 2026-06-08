@@ -1,18 +1,14 @@
 /**
  * FRICI AI Service
- * Llama al servidor Python local que tiene el contexto del usuario.
- * El servidor corre en localhost:8000.
+ * En desarrollo: apunta a localhost:8000
+ * En producción: apunta al servidor en Railway (definido en app.config.js)
  */
+import Constants from 'expo-constants';
 
-const SERVER_URL = 'http://localhost:8000';
+// Usa la URL del servidor configurada en app.config.js
+// Si no está definida, cae a localhost (desarrollo local)
+const SERVER_URL = Constants.expoConfig?.extra?.serverUrl || 'http://localhost:8000';
 
-/**
- * Envía un mensaje al chatbot con el contexto completo del usuario.
- * @param {string} message - Mensaje del usuario
- * @param {Array<{role, text}>} history - Historial de la conversación
- * @param {object} userContext - Datos del usuario: mood, checkin, habits, stats
- * @returns {Promise<string>} Respuesta de FRICI
- */
 export async function sendMessage(message, history = [], userContext = {}) {
   const response = await fetch(`${SERVER_URL}/chat`, {
     method: 'POST',
