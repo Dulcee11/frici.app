@@ -1,22 +1,23 @@
 @echo off
+cd /d "%~dp0"
+
+:: Lee la API key del archivo .env
+for /f "tokens=1,2 delims==" %%a in (.env) do (
+    if "%%a"=="ANTHROPIC_API_KEY" set ANTHROPIC_API_KEY=%%b
+)
+
+if "%ANTHROPIC_API_KEY%"=="" (
+    echo ERROR: No se encontro ANTHROPIC_API_KEY en el archivo .env
+    pause
+    exit /b 1
+)
+
 echo.
 echo  ==========================================
 echo   FRICI AI Server - Iniciando...
+echo   Servidor: http://localhost:8000
 echo  ==========================================
 echo.
-cd /d "%~dp0"
 
-:: Instala dependencias si no estan
-pip show fastapi >nul 2>&1 || (
-    echo Instalando dependencias Python...
-    pip install -r requirements.txt
-)
-
-echo  Servidor corriendo en http://localhost:8000
-echo  Salud: http://localhost:8000/health
-echo.
-echo  IMPORTANTE: Asegurate de haber puesto tu
-echo  API key de Anthropic en server.py
-echo.
-python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn server:app --host 0.0.0.0 --port 8000
 pause
