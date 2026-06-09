@@ -1,7 +1,7 @@
 // app.config.js — configuración dinámica de Expo
 // La URL del servidor se cambia aquí cuando despliegues en Railway.
 
-const SERVER_URL = process.env.FRICI_SERVER_URL || 'http://localhost:8000';
+const SERVER_URL = process.env.FRICI_SERVER_URL || 'https://friciapp-production.up.railway.app';
 
 module.exports = {
   expo: {
