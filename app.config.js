@@ -37,8 +37,11 @@ module.exports = {
       ["expo-calendar", { calendarPermission: "FRICI necesita acceder a tu calendario para detectar tu carga digital." }]
     ],
     extra: {
-      // 👇 Reemplaza esta URL después de desplegar en Railway
       serverUrl: SERVER_URL,
-    }
+      eas: {
+        projectId: "6c0c16f5-8c0f-439f-979d-423186afc907"
+      }
+    },
+    owner: "dulcee11"
   }
 };
