@@ -119,7 +119,7 @@ async def chat(req: ChatRequest):
         messages.append({"role": "user", "content": req.message})
 
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-haiku-4-5",
             max_tokens=600,
             system=system,
             messages=messages,
