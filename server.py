@@ -75,9 +75,10 @@ def build_context_text(ctx: dict) -> str:
             lines.append(f"- Emociones reportadas: {', '.join(emotions)}")
 
     if ctx.get("habits"):
-        done = [h["label"] for h in ctx["habits"] if h.get("done")]
-        pending = [h["label"] for h in ctx["habits"] if not h.get("done")]
-        streaks = [(h["label"], h.get("streak", 0)) for h in ctx["habits"] if h.get("streak", 0) > 0]
+        habits = [h for h in ctx["habits"] if h and isinstance(h, dict)]
+        done = [h["label"] for h in habits if h.get("done")]
+        pending = [h["label"] for h in habits if not h.get("done")]
+        streaks = [(h["label"], h.get("streak", 0)) for h in habits if h.get("streak", 0) > 0]
         if done:
             lines.append(f"- Hábitos completados hoy: {', '.join(done)}")
         if pending:
@@ -91,13 +92,14 @@ def build_context_text(ctx: dict) -> str:
         lines.append(f"- Racha de días consecutivos: {s.get('streakDays', 0)} días")
 
     # Detección automática de patrones de riesgo
+    checkin = ctx.get("checkin") or {}
     risk_signals = []
-    if ctx.get("checkin", {}).get("carga", 0) > 70:
+    if checkin.get("carga", 0) > 70:
         risk_signals.append("agenda muy cargada")
-    emotions = ctx.get("checkin", {}).get("emotions", [])
+    emotions = checkin.get("emotions") or []
     if any(e in emotions for e in ["Agotamiento", "Ansiedad", "Estrés"]):
         risk_signals.append("emociones de estrés")
-    sleep = ctx.get("checkin", {}).get("sleep", "")
+    sleep = checkin.get("sleep") or ""
     if "Mal" in sleep or "Regular" in sleep:
         risk_signals.append("sueño deficiente")
     if len(risk_signals) >= 2:
